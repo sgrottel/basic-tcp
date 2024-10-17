@@ -35,6 +35,7 @@ namespace BasicTcp
 					};
 				};
 
+				Console.WriteLine("Listening");
 				server.StartListen(endPoint, "It's_a_secret_to_everybody");
 
 				bool running = true;
