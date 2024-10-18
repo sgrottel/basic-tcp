@@ -1,4 +1,7 @@
-﻿using System.Net;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -148,7 +151,15 @@ namespace BasicTcp
 						rd.pos += len;
 					}
 
-					client.GetStream().BeginRead(rd.buffer, rd.pos, rd.target, OnDataReceived, rd);
+					try
+					{
+						client.GetStream().BeginRead(rd.buffer, rd.pos, rd.target - rd.pos, OnDataReceived, rd);
+					}
+					catch
+					{
+						Close();
+						return;
+					}
 				}
 			}
 
