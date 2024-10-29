@@ -25,17 +25,43 @@ namespace BasicTcp
 
 			public object? UserData { get; set; }
 
-			public void Send(ReadOnlySpan<byte> message)
+			public void Send(byte[] message)
+			{
+				Send([message]);
+			}
+
+			public void Send(ReadOnlyMemory<byte> message)
+			{
+				Send([message]);
+			}
+
+			/// <summary>
+			/// Sends one message split in multiple parts
+			/// This does NOT send multiple messages!
+			/// </summary>
+			public void Send(ReadOnlyMemory<byte>[] messageParts)
 			{
 				lock (sync)
 				{
 					var s = connection?.GetStream();
 					if (s == null) throw new Exception("Not connected");
 
-					s.Write(BitConverter.GetBytes((UInt32)message.Length));
-					if (message.Length > 0)
+					UInt32 totalLen = 0;
+					if (messageParts != null)
 					{
-						s.Write(message);
+						foreach (ReadOnlyMemory<byte> part in messageParts)
+						{
+							totalLen += (uint)part.Length;
+						}
+					}
+					s.Write(BitConverter.GetBytes(totalLen));
+					if (totalLen > 0)
+					{
+						foreach(ReadOnlyMemory<byte> part in messageParts!)
+						{
+							if (part.Length == 0) continue;
+							s.Write(part.Span);
+						}
 					}
 				}
 			}

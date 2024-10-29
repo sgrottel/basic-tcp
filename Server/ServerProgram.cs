@@ -43,9 +43,9 @@ namespace BasicTcp
 				while (running)
 				{
 					Console.Write("> ");
-					string input = (Console.ReadLine() ?? string.Empty).ToLowerInvariant();
+					string input = (Console.ReadLine() ?? string.Empty);
 
-					switch (input)
+					switch (input.ToLowerInvariant())
 					{
 						case "exit":
 							Console.WriteLine("Exiting");

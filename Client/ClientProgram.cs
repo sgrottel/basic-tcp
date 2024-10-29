@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Text;
 
@@ -30,11 +32,11 @@ namespace BasicTcp
 				while (running)
 				{
 					Console.Write("> ");
-					string input = (Console.ReadLine() ?? string.Empty).ToLowerInvariant();
+					string input = (Console.ReadLine() ?? string.Empty);
 
 					try
 					{
-						switch (input)
+						switch (input.ToLowerInvariant())
 						{
 							case "exit":
 								Console.WriteLine("Exiting");
@@ -54,7 +56,15 @@ namespace BasicTcp
 
 							default:
 								Console.WriteLine("Sending");
-								client.Send(Encoding.UTF8.GetBytes(input));
+								{
+									List<byte[]> data = new();
+									string[] strs = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+									for (int i = 1; i < strs.Length; ++i)
+									{
+										strs[i] = " " + strs[i];
+									}
+									client.Send(strs.Select(s => new ReadOnlyMemory<byte>(Encoding.UTF8.GetBytes(s))));
+								}
 								break;
 						}
 					}
