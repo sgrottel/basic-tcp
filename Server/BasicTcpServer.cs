@@ -29,7 +29,7 @@ namespace BasicTcp
 			{
 				lock (sync)
 				{
-					var s = client?.GetStream();
+					var s = connection?.GetStream();
 					if (s == null) throw new Exception("Not connected");
 
 					s.Write(BitConverter.GetBytes((UInt32)message.Length));
@@ -44,13 +44,13 @@ namespace BasicTcp
 			{
 				lock (sync)
 				{
-					if (client == null) return;
+					if (connection == null) return;
 					try
 					{
-						client.Close();
+						connection.Close();
 					}
 					catch { }
-					client = null;
+					connection = null;
 					Disconnected?.Invoke(this);
 
 					if (owner.TryGetTarget(out BasicTcpServer? server))
@@ -73,30 +73,39 @@ namespace BasicTcp
 				public int pos = 0;
 				public int target;
 				public bool receivingLen = true;
+				public TcpClient? connection;
 			}
 
-			private TcpClient? client;
+			private TcpClient? connection;
 			private WeakReference<BasicTcpServer> owner;
 			private object sync = new object();
 
 			internal Connection(BasicTcpServer owner, TcpClient client)
 			{
-				this.client = client;
+				connection = client;
 				this.owner = new(owner);
 
 				ReceiveData rd = new();
 				rd.target = 4;
 				rd.receivingLen = true;
-				this.client.GetStream().BeginRead(rd.buffer, rd.pos, rd.target, OnDataReceived, rd);
+				connection.GetStream().BeginRead(rd.buffer, rd.pos, rd.target, OnDataReceived, rd);
 			}
 
 			private void OnDataReceived(IAsyncResult ar)
 			{
 				lock (sync)
 				{
-					if (client == null) return;
+					if (connection == null) return;
 
-					if (!client.Connected)
+					ReceiveData rd = (ReceiveData)ar.AsyncState!;
+					if (rd.connection != connection)
+					{
+						// old connection already closed
+						// can happen here, because we can reuse the BasicTcpClient objects
+						return;
+					}
+
+					if (!connection.Connected)
 					{
 						Close();
 						return;
@@ -105,7 +114,7 @@ namespace BasicTcp
 					int len = 0;
 					try
 					{
-						len = client.GetStream().EndRead(ar);
+						len = connection.GetStream().EndRead(ar);
 					}
 					catch { }
 					if (len == 0)
@@ -114,7 +123,6 @@ namespace BasicTcp
 						return;
 					}
 
-					ReceiveData rd = (ReceiveData)ar.AsyncState!;
 					if (rd.pos + len == rd.target)
 					{
 						if (rd.receivingLen)
@@ -153,7 +161,7 @@ namespace BasicTcp
 
 					try
 					{
-						client.GetStream().BeginRead(rd.buffer, rd.pos, rd.target - rd.pos, OnDataReceived, rd);
+						connection.GetStream().BeginRead(rd.buffer, rd.pos, rd.target - rd.pos, OnDataReceived, rd);
 					}
 					catch
 					{
