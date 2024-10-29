@@ -41,10 +41,10 @@ namespace BasicTcp
 				connection = client;
 
 				ReceiveData rd = new();
-				rd.target = 4;
-				rd.receivingLen = true;
+				rd.lengthToReceive = 4;
+				rd.state = ReceiveState.MessageLength;
 				rd.connection = connection;
-				connection.GetStream().BeginRead(rd.buffer, rd.pos, rd.target, OnDataReceived, rd);
+				connection.GetStream().BeginRead(rd.buffer, rd.pos, rd.lengthToReceive, OnDataReceived, rd);
 			}
 		}
 
@@ -78,12 +78,22 @@ namespace BasicTcp
 			Disconnected?.Invoke(this);
 		}
 
+		private enum ReceiveState
+		{
+			MessageLength,
+			MessageData
+		};
+
 		private class ReceiveData
 		{
 			public byte[] buffer = new byte[1024];
+			// The write position with the buffer
 			public int pos = 0;
-			public int target;
-			public bool receivingLen = true;
+			// The number of bytes expected to be received in total
+			public int lengthToReceive = 0;
+			// The state of what element of the message to receive next
+			public ReceiveState state;
+			// The connection receive from
 			public TcpClient? connection;
 		}
 
@@ -122,35 +132,35 @@ namespace BasicTcp
 					return;
 				}
 
-				if (rd.pos + len == rd.target)
+				if (rd.pos + len == rd.lengthToReceive)
 				{
-					if (rd.receivingLen)
+					if (rd.state == ReceiveState.MessageLength)
 					{
 						uint msglen = BitConverter.ToUInt32(rd.buffer, 0);
 						if (msglen > 0)
 						{
 							rd.pos = 0;
-							rd.target = (int)msglen;
-							if (rd.buffer.Length < rd.target)
+							rd.lengthToReceive = (int)msglen;
+							if (rd.buffer.Length < rd.lengthToReceive)
 							{
-								rd.buffer = new byte[rd.target];
+								rd.buffer = new byte[rd.lengthToReceive];
 							}
-							rd.receivingLen = false;
+							rd.state = ReceiveState.MessageData;
 						}
 						else
 						{
 							rd.pos = 0;
-							rd.target = 4;
-							rd.receivingLen = true;
+							rd.lengthToReceive = 4;
+							rd.state = ReceiveState.MessageLength;
 						}
 					}
 					else
 					{
-						MessageReceived?.Invoke(this, rd.buffer.AsSpan(0, rd.target));
+						MessageReceived?.Invoke(this, rd.buffer.AsSpan(0, rd.lengthToReceive));
 
 						rd.pos = 0;
-						rd.target = 4;
-						rd.receivingLen = true;
+						rd.lengthToReceive = 4;
+						rd.state = ReceiveState.MessageLength;
 					}
 				}
 				else
@@ -160,7 +170,7 @@ namespace BasicTcp
 
 				try
 				{
-					connection.GetStream().BeginRead(rd.buffer, rd.pos, rd.target - rd.pos, OnDataReceived, rd);
+					connection.GetStream().BeginRead(rd.buffer, rd.pos, rd.lengthToReceive - rd.pos, OnDataReceived, rd);
 				}
 				catch
 				{
