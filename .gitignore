@@ -3,3 +3,4 @@ Client/bin
 Client/obj
 Server/bin
 Server/obj
+*.user
